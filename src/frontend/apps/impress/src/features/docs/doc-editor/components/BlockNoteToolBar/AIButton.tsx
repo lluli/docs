@@ -82,7 +82,6 @@ const AIMenuItemFactCheck = ({
   );
 };
 
-
 const sortByPopularLanguages = (
   languages: LanguageTranslate[],
   popularLanguages: string[],
