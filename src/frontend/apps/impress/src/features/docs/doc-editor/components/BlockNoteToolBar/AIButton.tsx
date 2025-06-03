@@ -21,12 +21,67 @@ import {
   AITransformActions,
   useDocAITransform,
   useDocAITranslate,
+  useDocAIFactCheck,
 } from '../../api';
 
 type LanguageTranslate = {
   value: string;
   display_name: string;
 };
+
+const AIMenuItemFactCheck = ({
+  docId,
+  icon,
+  children,
+}: PropsWithChildren<{ docId: string; icon?: ReactNode }>) => {
+  const { mutateAsync: requestAI, isPending } = useDocAIFactCheck();
+  const editor = useBlockNoteEditor();
+
+  const requestAIFactCheck = async (selectedBlocks: Block[]) => {
+    const text = await editor.blocksToMarkdownLossy(selectedBlocks);
+
+    const responseAI = await requestAI({
+      text,
+      docId,
+    });
+
+    if (
+      !responseAI ||
+      !responseAI.answer ||
+      typeof responseAI.answer !== 'object'
+    ) {
+      throw new Error('No response from AI');
+    }
+
+    const { claim, accuracy, justification, references } = responseAI.answer;
+
+    let markdown = `> **Claim:** ${claim}\n\n`;
+    markdown += `**Accuracy:** ${accuracy}\n\n`;
+    markdown += `${justification}\n\n`;
+
+    if (Array.isArray(references) && references.length > 0) {
+      markdown += `**References:**\n`;
+      references.forEach((ref: string, idx: number) => {
+        markdown += `[${idx + 1}](${ref}) `;
+      });
+      markdown += '\n';
+    }
+
+    const blocks = await editor.tryParseMarkdownToBlocks(markdown);
+    editor.replaceBlocks(selectedBlocks, blocks);
+  };
+
+  return (
+    <AIMenuItem
+      icon={icon}
+      requestAI={requestAIFactCheck}
+      isPending={isPending}
+    >
+      {children}
+    </AIMenuItem>
+  );
+};
+
 
 const sortByPopularLanguages = (
   languages: LanguageTranslate[],
@@ -159,6 +214,13 @@ export function AIGroupButton() {
             >
               {t('Emojify')}
             </AIMenuItemTransform>
+
+            <AIMenuItemFactCheck
+              docId={currentDoc.id}
+              icon={<Icon iconName="published_with_changes" $size="s" />}
+            >
+              {t('Fact Check')}
+            </AIMenuItemFactCheck>
           </>
         )}
         {canAITranslate && (
